@@ -1,11 +1,9 @@
-
-
-import '../widgets/base_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import '../widgets/sidebar.dart';
+import '../widgets/header.dart';
+import '../widgets/footer.dart';
 import '../services/api_service.dart';
-
-import '../widgets/confirm_modal.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -17,21 +15,26 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final ApiService api = ApiService();
 
+  // User Data
   String fullName = "";
   String email = "";
   String phone = "";
+
   bool isLoading = true;
 
+  // ===== Phone =====
   TextEditingController phoneController = TextEditingController();
   bool isEditingPhone = false;
   String phoneError = "";
 
+  // ===== Password modal =====
   bool showPasswordModal = false;
   TextEditingController oldPassword = TextEditingController();
   TextEditingController newPassword = TextEditingController();
   TextEditingController confirmPassword = TextEditingController();
   List<String> passwordErrors = ["", "", ""];
 
+  // ===== Notification modal =====
   bool showNotificationModal = false;
   bool emailNotification = true;
   bool siteNotification = true;
@@ -42,25 +45,31 @@ class _ProfilePageState extends State<ProfilePage> {
     _loadUserData();
   }
 
-  Future<void> _loadUserData() async {
-    try {
-      final data = await api.me();
-      final user = data["user"];
-      setState(() {
-        fullName = user["name"] ?? "";
-        email = user["email"] ?? "";
-        phone = user["phoneNumber"] ?? "";
-        emailNotification = user["emailNotificationPreferences"] ?? true;
-        siteNotification = user["siteNotificationPreferences"] ?? true;
-        phoneController.text = user["phoneNumber"] ?? "";
-        isLoading = false;
-      });
-    } catch (e) {
-      print("Error fetching profile: $e");
-      setState(() => isLoading = false);
-    }
-  }
+Future<void> _loadUserData() async {
+  try {
+    final data = await api.me();
+    print("USER DATA FROM API: $data");
 
+    final user = data["user"]; // <=== هنا
+
+    setState(() {
+      fullName = user["name"] ?? "";
+      email = user["email"] ?? "";
+      phone = user["phoneNumber"] ?? "";
+      emailNotification = user["emailNotificationPreferences"] ?? true;
+      siteNotification = user["siteNotificationPreferences"] ?? true;
+
+      phoneController.text = user["phoneNumber"] ?? "";
+
+      isLoading = false;
+    });
+  } catch (e) {
+    print("Error fetching profile: $e");
+    setState(() => isLoading = false);
+  }
+}
+
+  // ===== Update phone in backend =====
   Future<void> _savePhone() async {
     try {
       await api.updateProfile(phone: phoneController.text);
@@ -74,26 +83,35 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  // ===== Update notifications in backend =====
   Future<void> _saveNotifications() async {
-    try {
-      await api.updateProfile(
-        emailPref: emailNotification,
-        sitePref: siteNotification,
-      );
-      await _loadUserData();
-      setState(() => showNotificationModal = false);
-    } catch (e) {
-      print("Error updating notifications: $e");
-    }
-  }
+  try {
+    await api.updateProfile(
+      emailPref: emailNotification,
+      sitePref: siteNotification,
+    );
 
+    // بعد الحفظ نرجع نعمل load تاني من الباك إند
+    await _loadUserData();
+
+    setState(() {
+      showNotificationModal = false;
+    });
+  } catch (e) {
+    print("Error updating notifications: $e");
+  }
+}
+
+  // ===== Change password in backend =====
   Future<void> _savePassword() async {
     setState(() {
       passwordErrors = ["", "", ""];
     });
 
     if (newPassword.text != confirmPassword.text) {
-      setState(() => passwordErrors[2] = "Passwords do not match");
+      setState(() {
+        passwordErrors[2] = "Passwords do not match";
+      });
       return;
     }
 
@@ -107,36 +125,207 @@ class _ProfilePageState extends State<ProfilePage> {
       });
     } catch (e) {
       print("Error changing password: $e");
-      setState(() => passwordErrors[0] = "Invalid old password");
+      setState(() {
+        passwordErrors[0] = "Invalid old password";
+      });
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Scaffold(
+      drawer: Sidebar(
+        isLoggedIn: true,
+        // onLogout: () async {
+        //   await api.logout();
+        //   Navigator.pushReplacementNamed(context, "/login");
+        // },
+        activeRoute: "/profile",
+      ),
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              SizedBox(height: MediaQuery.of(context).padding.top),
+              Header(),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(15),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ===== Header =====
+                      Text(
+                        fullName.split(" ").take(2).join(" "),
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF800020),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // ===== Personal Info =====
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(15),
+                          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: const [
+                                    FaIcon(FontAwesomeIcons.userCircle, color: Color(0xFFB8860B)),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      "Personal Information",
+                                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Color(0xFF800020)),
+                                    ),
+                                  ],
+                                ),
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    setState(() {
+                                      if (isEditingPhone) {
+                                        if (RegExp(r'^01[0-2,5]{1}[0-9]{8}$').hasMatch(phoneController.text)) {
+                                          _savePhone();
+                                        } else {
+                                          phoneError = "Please enter a valid phone number!";
+                                        }
+                                      } else {
+                                        isEditingPhone = true;
+                                      }
+                                    });
+                                  },
+                                  icon: FaIcon(
+                                    isEditingPhone ? FontAwesomeIcons.check : FontAwesomeIcons.edit,
+                                    size: 16,
+                                    color: Color(0xFFB8860B),
+                                  ),
+                                  label: Text(isEditingPhone ? "Save" : "Edit"),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Color(0xFF800020),
+                                    foregroundColor: Colors.white,
+                                  ),
+                                )
+                              ],
+                            ),
+                            const SizedBox(height: 15),
+                            _buildLabelValue("Full Name", fullName, editable: false),
+                            _buildLabelValue("Email", email, editable: false),
+                            _buildLabelValue(
+                              "Phone Number",
+                              phoneController.text,
+                              editable: isEditingPhone,
+                              controller: phoneController,
+                              errorText: phoneError,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // ===== Account Settings =====
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(15),
+                          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: const [
+                                FaIcon(FontAwesomeIcons.cog, color: Color(0xFFB8860B)),
+                                SizedBox(width: 10),
+                                Text("Account Settings",
+                                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Color(0xFF800020))),
+                              ],
+                            ),
+                            const SizedBox(height: 15),
+
+                            // Password Section
+                            Text("Password", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                            const SizedBox(height: 5),
+                            Row(
+                              children: List.generate(
+                                8,
+                                (index) => Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                                  child: Text("•", style: TextStyle(fontSize: 18, color: Colors.grey.shade600)),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            ElevatedButton.icon(
+                              icon: const FaIcon(FontAwesomeIcons.key),
+                              label: const Text("Change Password"),
+                              onPressed: () => setState(() => showPasswordModal = true),
+                              style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF800020), foregroundColor: Colors.white),
+                            ),
+                            const SizedBox(height: 15),
+
+                            // Notification Section
+                            Text("Notification Preference", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                            const SizedBox(height: 5),
+                            Text(_getNotificationText(), style: TextStyle(color: Colors.grey.shade600)),
+                            const SizedBox(height: 5),
+                            ElevatedButton.icon(
+                              icon: const FaIcon(FontAwesomeIcons.bell),
+                              label: const Text("Manage Notifications"),
+                              onPressed: () => setState(() => showNotificationModal = true),
+                              style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF800020), foregroundColor: Colors.white),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Footer(),
+            ],
+          ),
+
+          // ===== Modals =====
+          if (showPasswordModal) _buildPasswordModal(context),
+          if (showNotificationModal) _buildNotificationModal(context),
+        ],
+      ),
+    );
   }
 
   String _getNotificationText() {
     List<String> selected = [];
     if (emailNotification) selected.add("Email");
     if (siteNotification) selected.add("In-App");
-    return selected.isEmpty ? "Mute Notifications" : selected.join(", ");
+    if (selected.isEmpty) return "Mute Notifications";
+    return selected.join(", ");
   }
 
-  Widget _buildLabelValue(
-    String label,
-    String value, {
-    bool editable = false,
-    TextEditingController? controller,
-    String errorText = "",
-  }) {
+  Widget _buildLabelValue(String label, String value,
+      {bool editable = false, TextEditingController? controller, String errorText = ""}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
           const SizedBox(height: 5),
           editable
               ? TextField(
@@ -149,242 +338,13 @@ class _ProfilePageState extends State<ProfilePage> {
                   keyboardType: TextInputType.phone,
                   style: TextStyle(color: Colors.grey.shade600),
                 )
-              : Text(
-                  value,
-                  style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-                ),
+              : Text(value, style: TextStyle(fontSize: 16, color: Colors.grey.shade600)),
         ],
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    return BaseLayout(
-      activeRoute: "/profile",
-      isLoggedIn: true,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(15),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              fullName.split(" ").take(2).join(" "),
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF800020),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Personal Info
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: const [
-                            FaIcon(
-                              FontAwesomeIcons.userCircle,
-                              color: Color(0xFFB8860B),
-                            ),
-                            SizedBox(width: 10),
-                            Text(
-                              "Personal Information",
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF800020),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            if (isEditingPhone) {
-                              if (RegExp(
-                                r'^01[0-2,5]{1}[0-9]{8}$',
-                              ).hasMatch(phoneController.text)) {
-                                _savePhone();
-                              } else {
-                                phoneError =
-                                    "Please enter a valid phone number!";
-                              }
-                            } else {
-                              isEditingPhone = true;
-                            }
-                          });
-                        },
-                        icon: FaIcon(
-                          isEditingPhone
-                              ? FontAwesomeIcons.check
-                              : FontAwesomeIcons.edit,
-                          size: 14, 
-                          color: Color(0xFFB8860B),
-                        ),
-                        label: Text(
-                          isEditingPhone ? "Save" : "Edit",
-                          style: TextStyle(fontSize: 14), 
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFF800020),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 13,
-                            vertical: 8,
-                          ), 
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              8,
-                            ),
-                          ),
-                          minimumSize: const Size(
-                            0,
-                            0,
-                          ), 
-                          tapTargetSize: MaterialTapTargetSize
-                              .shrinkWrap, 
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-
-                  // Full Name
-                  _buildLabelValue("Full Name", fullName, editable: false),
-                  // Email
-                  _buildLabelValue("Email", email, editable: false),
-                  // Phone Number
-                  _buildLabelValue(
-                    "Phone Number",
-                    phoneController.text,
-                    editable: isEditingPhone,
-                    controller: phoneController,
-                    errorText: phoneError,
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Account Settings
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: const [
-                      FaIcon(FontAwesomeIcons.cog, color: Color(0xFFB8860B)),
-                      SizedBox(width: 10),
-                      Text(
-                        "Account Settings",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF800020),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-
-                  // Password
-                  Text(
-                    "Password",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Row(
-                    children: List.generate(
-                      8,
-                      (index) => Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                        child: Text(
-                          "•",
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  ElevatedButton.icon(
-                    icon: const FaIcon(FontAwesomeIcons.key),
-                    label: const Text("Change Password"),
-                    onPressed: () => setState(() => showPasswordModal = true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF800020),
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-
-                  // Notifications
-                  Text(
-                    "Notification Preference",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    _getNotificationText(),
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                  const SizedBox(height: 5),
-                  ElevatedButton.icon(
-                    icon: const FaIcon(FontAwesomeIcons.bell),
-                    label: const Text("Manage Notifications"),
-                    onPressed: () =>
-                        setState(() => showNotificationModal = true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF800020),
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Modals
-            if (showPasswordModal) _buildPasswordModal(context),
-            if (showNotificationModal) _buildNotificationModal(context),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Password Modal
+  // ===== Password Modal =====
   Widget _buildPasswordModal(BuildContext context) {
     return Stack(
       children: [
@@ -396,45 +356,23 @@ class _ProfilePageState extends State<ProfilePage> {
           child: Container(
             padding: const EdgeInsets.all(20),
             margin: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
             width: 400,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  "Reset Password",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF800020),
-                  ),
-                ),
+                const Text("Reset Password",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF800020))),
                 const SizedBox(height: 15),
-                _buildPasswordField(
-                  "Old Password",
-                  oldPassword,
-                  passwordErrors[0],
-                ),
-                _buildPasswordField(
-                  "New Password",
-                  newPassword,
-                  passwordErrors[1],
-                ),
-                _buildPasswordField(
-                  "Confirm Password",
-                  confirmPassword,
-                  passwordErrors[2],
-                ),
+                _buildPasswordField("Old Password", oldPassword, passwordErrors[0]),
+                _buildPasswordField("New Password", newPassword, passwordErrors[1]),
+                _buildPasswordField("Confirm Password", confirmPassword, passwordErrors[2]),
                 const SizedBox(height: 15),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     ElevatedButton(
-                      onPressed: () =>
-                          setState(() => showPasswordModal = false),
+                      onPressed: () => setState(() => showPasswordModal = false),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF800020),
                         foregroundColor: Colors.white,
@@ -452,7 +390,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: const Text("Save"),
                     ),
                   ],
-                ),
+                )
               ],
             ),
           ),
@@ -461,11 +399,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildPasswordField(
-    String label,
-    TextEditingController controller,
-    String error,
-  ) {
+  Widget _buildPasswordField(String label, TextEditingController controller, String error) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -477,14 +411,9 @@ class _ProfilePageState extends State<ProfilePage> {
             controller: controller,
             obscureText: true,
             decoration: InputDecoration(
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(5),
-              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
               errorText: error.isNotEmpty ? error : null,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 8,
-              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             ),
           ),
         ],
@@ -492,7 +421,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // Notification Modal
+  // ===== Notification Modal =====
   Widget _buildNotificationModal(BuildContext context) {
     return Stack(
       children: [
@@ -504,42 +433,30 @@ class _ProfilePageState extends State<ProfilePage> {
           child: Container(
             padding: const EdgeInsets.all(20),
             margin: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
             width: 400,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  "Manage Notifications",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF800020),
-                  ),
-                ),
+                const Text("Manage Notifications",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF800020))),
                 const SizedBox(height: 15),
                 CheckboxListTile(
                   title: const Text("Email Notifications"),
                   value: emailNotification,
-                  onChanged: (val) =>
-                      setState(() => emailNotification = val ?? true),
+                  onChanged: (val) => setState(() => emailNotification = val ?? true),
                 ),
                 CheckboxListTile(
                   title: const Text("In-App Notifications"),
                   value: siteNotification,
-                  onChanged: (val) =>
-                      setState(() => siteNotification = val ?? true),
+                  onChanged: (val) => setState(() => siteNotification = val ?? true),
                 ),
                 const SizedBox(height: 15),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     ElevatedButton(
-                      onPressed: () =>
-                          setState(() => showNotificationModal = false),
+                      onPressed: () => setState(() => showNotificationModal = false),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF800020),
                         foregroundColor: Colors.white,
@@ -557,7 +474,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: const Text("Save"),
                     ),
                   ],
-                ),
+                )
               ],
             ),
           ),
